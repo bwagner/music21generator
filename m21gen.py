@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
-import warnings
 import pathlib
+import warnings
 from abc import ABC, abstractmethod
-
-from music21 import *
 from textwrap import dedent
 
+from music21 import *
+
 SCORE_NAME = "score"
-PART_NAME = "part"
-MEASURE_NAME = "measure"
+HANDLES_ATTR = "handles"
 
 if __name__ == "__main__":
-    from music21 import converter
     import sys
+
+    from music21 import converter
 
 
 class ElementHandler(ABC):
@@ -21,242 +21,325 @@ class ElementHandler(ABC):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if hasattr(cls, "handles"):
+        if hasattr(cls, HANDLES_ATTR):
             if cls.handles:
                 ElementHandler._handlers[cls.handles] = cls()
             else:
                 warnings.warn(
-                    f"Subclass {cls.__name__} has no handles attribute set. It will not be registered."
+                    f"Subclass {cls.__name__} has no {HANDLES_ATTR} attribute set. It will not be registered."
                 )
-        else:
+        elif (
+            cls.__name__ != "ContainerHandler"
+        ):  # using string here, otherwise ContainerHandler is not defined yet
             warnings.warn(
-                f"Subclass {cls.__name__} is missing a handles attribute and will not be registered."
+                f"Subclass {cls.__name__} is missing a {HANDLES_ATTR} attribute and will not be registered."
             )
 
-    @abstractmethod
-    def generate_code(self, element):
-        pass
+    def generate_code(self, element, name):
+        """
+        May be implemented by subclasses.
+        Returns a tuple: the code to generate this element and True if the element should be inserted
+                         at the beginning, False if at the end of its container.
+        """
+        params, insert = self.get_params(element)
+        return (
+            f"{name} = {self.get_hcls()}({params})",
+            insert,
+        )
+
+    def get_params(self, element, name) -> str:
+        """
+        Implemented by subclasses, if they don't implement generate_code.
+        Returns a tuple:
+        - A string consisting of the parameters for the constructor of the music21-class
+          handled by this Handler.
+        - True if the element should be inserted at the beginning, False if at the end
+          of its container.
+        Not declared abstractmethod, because sometimes generated_code is overridden
+        and no get_params method is required.
+        """
+        raise NotImplementedError("abstract method: This code should never run.")
 
     @classmethod
     def get_handler(cls, element):
         element_type = type(element)
         while element_type is not None:
-            handler = cls._handlers.get(element_type)
-            if handler:
+            if handler := cls._handlers.get(element_type):
                 return handler
             # Move up the inheritance hierarchy
             element_type = element_type.__base__
         return None
 
+    @classmethod
+    def get_hcls(cls):
+        """
+        Gets the music21-class handled by this Handler as string, stripped of
+        top level module "music21".
+        """
+        h = cls.handles
+        return f"{h.__module__[h.__module__.index('.')+1:]}.{h.__qualname__}"
+
 
 class NoteHandler(ElementHandler):
     handles = note.Note
 
-    def generate_code(self, element):
-        return f"n = note.Note('{element.pitch}', duration=duration.Duration({element.duration.quarterLength}))\nmeasure.append(n)"
+    def get_params(self, element):
+        return (
+            f"'{element.pitch}', duration=duration.Duration({element.duration.quarterLength})",
+            False,
+        )
 
 
 class ChordHandler(ElementHandler):
     handles = chord.Chord
 
-    def generate_code(self, element):
+    def get_params(self, element):
         pitches = ", ".join([f"'{p}'" for p in element.pitches])
-        return f"c = chord.Chord([{pitches}], duration=duration.Duration({element.duration.quarterLength}))\nmeasure.append(c)"
+        return (
+            f"[{pitches}], duration=duration.Duration({element.duration.quarterLength})",
+            False,
+        )
 
 
 class ChordSymbolHandler(ElementHandler):
     handles = harmony.ChordSymbol
 
-    def generate_code(self, element):
+    def get_params(self, element):
         chord_figure = element.figure  # Get the chord symbol as a string, e.g., "Cmaj7"
-        return f"c = harmony.ChordSymbol('{chord_figure}')\nmeasure.append(c)"
+        return f"'{chord_figure}'", False
 
 
 class TimeSignatureHandler(ElementHandler):
     handles = meter.TimeSignature
 
-    def generate_code(self, element):
-        return f"ts = meter.TimeSignature('{element.ratioString}')\nmeasure.append(ts)"
+    def get_params(self, element):
+        return f"'{element.ratioString}'", False
 
 
 class ClefHandler(ElementHandler):
     handles = clef.Clef
 
-    def generate_code(self, element):
-        return f"cl = clef.{type(element).__name__}()\nmeasure.append(cl)"
+    def generate_code(self, element, name):
+        """
+        Can't use the generic generate_code, because we're messing with the choice
+        of constructor.
+        """
+        return f"{name} = clef.{type(element).__name__}()", False
 
 
 class KeySignatureHandler(ElementHandler):
     handles = key.KeySignature
 
-    def generate_code(self, element):
-        return f"ks = key.KeySignature({element.sharps})\nmeasure.append(ks)"
+    def get_params(self, element):
+        return f"{element.sharps}", False
 
 
 class BarlineHandler(ElementHandler):
     handles = bar.Barline
 
-    def generate_code(self, element):
-        return f"bl = bar.Barline('{element.type}')\nmeasure.append(bl)"
+    def get_params(self, element):
+        return f"'{element.type}'", False
+
 
 class InstrumentHandler(ElementHandler):
     handles = instrument.Instrument
 
-    def generate_code(self, element):
+    def generate_code(self, element, name):
+        """
+        Can't use the generic generate_code, because we're messing with the choice
+        of constructor.
+        """
         instrument_name = type(element).__name__
-        return f"inst = instrument.{instrument_name}()\npart.insert(0, inst)"
-
-
-class PartHandler(ElementHandler):
-    handles = stream.Part
-
-    def generate_code(self, element):
-        code_lines = [f"{PART_NAME} = stream.Part()"]
-        for sub_element in element:
-#            print(f"# {sub_element=}")
-            handler = ElementHandler.get_handler(sub_element)
-            if handler:
-                element_code = handler.generate_code(sub_element)
-                code_lines.extend(element_code.split('\n'))
-            else:
-                raise NotImplementedError(
-                    f"No handler implemented for sub-element type {type(sub_element)} in Part"
-                )
-
-            # TODO: sub_elements of Part should return their variable name, so they can
-            #       be added to te part. Better yet: The parent handler (here: PartHandler)
-            #       should define the name of the variable that the sub_element should name
-            #       itself.
-            # code_lines.append(f"{PART_NAME}.append(measure)")  # TODO: see comment just above
-
-        code_lines.append(f"{SCORE_NAME}.append({PART_NAME})")
-        return "\n".join(code_lines)
-
-
-class MeasureHandler(ElementHandler):
-    handles = stream.Measure
-
-    def generate_code(self, element):
-        code_lines = [f"{MEASURE_NAME} = stream.Measure()"]
-        for sub_element in element:
-            handler = ElementHandler.get_handler(sub_element)
-            if handler:
-                code_lines.append(handler.generate_code(sub_element))
-            else:
-                raise NotImplementedError(
-                    f"No handler implemented for sub-element type {type(sub_element)} in Measure"
-                )
-        code_lines.append(f"{PART_NAME}.append({MEASURE_NAME})")  # TODO: see comment in PartHandler
-        return "\n".join(code_lines)
+        return f"{name} = instrument.{instrument_name}()", True
 
 
 class MetronomeMarkHandler(ElementHandler):
     handles = tempo.MetronomeMark
 
-    def generate_code(self, element):
-        return f"tm = tempo.MetronomeMark(number={element.number})\nmeasure.append(tm)"
+    def get_params(self, element):
+        return f"number={element.number}", False
 
 
 class MetadataHandler(ElementHandler):
     handles = metadata.Metadata
 
-    def generate_code(self, element):
-        code_lines = []
-        if element.title:
-            code_lines.append(f"md = metadata.Metadata(title='{element.title}')")
-            code_lines.append(f"{SCORE_NAME}.insert(0, md)")
-        # You can add similar lines for other metadata fields like composer, date, etc.
-        return "\n".join(code_lines)
+    def get_params(self, element):
+        return f"title='{element.title}', composer='{element.composer}'", True
 
 
 class RestHandler(ElementHandler):
     handles = note.Rest
 
-    def generate_code(self, element):
-        return f"r = note.Rest(duration=duration.Duration({element.duration.quarterLength}))\nmeasure.append(r)"
+    def get_params(self, element):
+        return (
+            f"duration=duration.Duration({element.duration.quarterLength})",
+            False,
+        )
+
 
 class TextBoxHandler(ElementHandler):
     handles = text.TextBox
 
-    def generate_code(self, element):
-        # Escape single quotes in the text content
+    def generate_code(self, element, name):
         content = element.content.replace("'", "\\'")
-        # Generate code to recreate the TextBox
-        return f"tb = text.TextBox(content='{content}')\n" \
-               f"tb.style = '{element.style}'\n" \
-               f"tb.positionX = {element.positionX}\n" \
-               f"tb.positionY = {element.positionY}\n" \
-               "score.insert(0, tb)"
+
+        style_code = ""
+        if element.style:
+            style_code += f"{name}_style = style.TextStyle()\n"
+
+            # Function to check if an attribute is scalar
+            def is_scalar(attr):
+                return isinstance(attr, (int, float, str, bool))
+
+            # Iterate over attributes and handle only scalar values
+            for attr in dir(element.style):
+                if not attr.startswith("__") and not callable(
+                    getattr(element.style, attr)
+                ):
+                    value = getattr(element.style, attr)
+                    if is_scalar(value):
+                        # String values need to be quoted
+                        if isinstance(value, str):
+                            value = f"'{value}'"
+                        style_code += f"{name}_style.{attr} = {value}\n"
+
+            style_code += f"{name}.style = {name}_style\n"
+
+        return f"{name} = {self.get_hcls()}(content='{content}')\n" + style_code, True
+
 
 class ScoreLayoutHandler(ElementHandler):
     handles = layout.ScoreLayout
 
-    def generate_code(self, element):
+    def generate_code(self, element, name):
         # Generate code to recreate the ScoreLayout
         # Note: ScoreLayout can have various attributes. Adjust this to handle the attributes you're using.
-        code_lines = ["score_layout = layout.ScoreLayout()"]
+        code_lines = [f"{name} = {self.get_hcls()}()"]
 
-        if hasattr(element, 'staffDistance'):
-            code_lines.append(f"score_layout.staffDistance = {element.staffDistance}")
+        if hasattr(element, "staffDistance"):
+            code_lines.append(f"{name}.staffDistance = {element.staffDistance}")
 
         # Include other relevant attributes of ScoreLayout as needed
         # ...
 
-        code_lines.append("score.insert(0, score_layout)")
-
-        return "\n".join(code_lines)
+        return "\n".join(code_lines), True
 
 
 class SystemLayoutHandler(ElementHandler):
     handles = layout.SystemLayout
 
-    def generate_code(self, element):
+    def generate_code(self, element, name):
         # Generate code to recreate the SystemLayout
         # Note: SystemLayout can have various attributes. The example below covers a few.
         # You might need to adjust this to handle the specific attributes you're using.
         code_lines = []
-        if element.isNew:
-            code_lines.append("sys_layout = layout.SystemLayout(isNew=True)")
-        else:
-            code_lines.append("sys_layout = layout.SystemLayout()")
 
-        if hasattr(element, 'systemDistance'):
-            code_lines.append(f"sys_layout.systemDistance = {element.systemDistance}")
+        code_lines.append(f"{name} = {self.get_hcls()}(isNew={element.isNew})")
 
-        if hasattr(element, 'topSystemDistance'):
-            code_lines.append(f"sys_layout.topSystemDistance = {element.topSystemDistance}")
+        if hasattr(element, "systemDistance"):
+            code_lines.append(f"{name}.systemDistance = {element.systemDistance}")
 
-        code_lines.append("measure.insert(0, sys_layout)")
+        if hasattr(element, "topSystemDistance"):
+            code_lines.append(f"{name}.topSystemDistance = {element.topSystemDistance}")
 
-        return "\n".join(code_lines)
+        return "\n".join(code_lines), True
 
 
-def generate_code_for_element(element):
-    handler = ElementHandler.get_handler(element)
-    if handler:
-        return handler.generate_code(element)
-    else:
-        raise NotImplementedError(
-            f"Unhandled element type {type(element)}. Candidates: {ElementHandler._handlers=}"
-        )
+class PageLayoutHandler(ElementHandler):
+    handles = layout.PageLayout
+
+    def generate_code(self, element, name):
+        code_lines = [f"{name} = layout.PageLayout()"]
+
+        # List of potential properties in PageLayout
+        properties = [
+            "leftMargin",
+            "rightMargin",
+            "topMargin",
+            "bottomMargin",
+            "pageHeight",
+            "pageWidth",
+            "isPortrait",
+            # Add more properties here as needed
+        ]
+
+        # Iterate over properties and set them if they are not None
+        for prop in properties:
+            value = getattr(element, prop, None)
+            if value is not None:
+                code_lines.append(f"{name}.{prop} = {value}")
+
+        return "\n".join(code_lines), True
 
 
-def generate_code_for_music_structure(music_structure, add_boilerplate=False, musicxml_out_fn="output.musicxml"):
-    code = [
+class TextExpressionHandler(ElementHandler):
+    handles = expressions.TextExpression
+
+    def generate_code(self, element, name):
+        # Escape single quotes in the text content
+        content = element.content.replace("'", "\\'")
+        return f"{name} = expressions.TextExpression('{content}')\n", False
+
+
+class ContainerHandler(ElementHandler):
+    def generate_code(self, element, name):
+        code_lines = [f"{name} = stream.{self.handles.__qualname__}()"]
+        prefix = self.handles.__qualname__.lower()
+        for i, sub_element in enumerate(element):
+            if handler := ElementHandler.get_handler(sub_element):
+                element_code, insert = handler.generate_code(
+                    sub_element, f"{prefix}_e{i}"
+                )
+                code_lines.extend(element_code.split("\n"))
+                if insert:
+                    code_lines.append(f"{name}.insert(0, {prefix}_e{i})")
+                else:
+                    code_lines.append(f"{name}.append({prefix}_e{i})")
+            else:
+                raise NotImplementedError(
+                    f"No handler implemented for sub-element type {type(sub_element)} in {self.handles.__qualname__}."
+                )
+        return "\n".join(code_lines), False
+
+
+class PartHandler(ContainerHandler):
+    handles = stream.Part
+
+
+class MeasureHandler(ContainerHandler):
+    handles = stream.Measure
+
+
+class ScoreHandler(ContainerHandler):
+    handles = stream.Score
+
+
+class StreamHandler(ContainerHandler):
+    handles = stream.Stream
+
+
+def generate_code_for_music_structure(
+    music_structure, add_boilerplate=False, musicxml_out_fn="output.musicxml"
+):
+    code_lines = [
         "from music21 import *",
         "",
-        f"{SCORE_NAME} = stream.Score()",
     ]
 
-    for element in music_structure:
-        element_code = generate_code_for_element(element)
-        code.extend(element_code.split("\n"))
+    if handler := ElementHandler.get_handler(music_structure):
+        element_code, insert = handler.generate_code(music_structure, f"{SCORE_NAME}")
+        code_lines.extend(element_code.split("\n"))
+    else:
+        raise NotImplementedError(
+            f"No handler implemented for sub-element type {type(music_structure)} in MusicStructure"
+        )
 
-    code_str = "\n".join(code)
+    code_str = "\n".join(code_lines)
 
     if add_boilerplate:
         print("# adding boilerplate")
-        code_str += dedent(fr"""
+        code_str += dedent(
+            rf"""
 
         if not {SCORE_NAME}.isWellFormedNotation():
             print("The score is not well-formed. Check the structure and contents.")
@@ -266,7 +349,8 @@ def generate_code_for_music_structure(music_structure, add_boilerplate=False, mu
         file_path = "{musicxml_out_fn}"
         print(f"Saved to \"{musicxml_out_fn}\"")
         {SCORE_NAME}.write("musicxml", fp=file_path)
-        """)
+        """
+        )
     else:
         print("# skipping boilerplate")
 
@@ -274,20 +358,21 @@ def generate_code_for_music_structure(music_structure, add_boilerplate=False, mu
 
 
 def main():
-
     if add_boilerplate := len(sys.argv) > 1 and sys.argv[1] == "-b":
         sys.argv.pop(0)
 
     musicxml_file_path = sys.argv[1]
     score = converter.parse(musicxml_file_path)
-#    score.show("text")
+    # score.show("text")
     if not score.isWellFormedNotation():
         print("The score is not well-formed. Check the structure and contents.")
     else:
         print("#  The score is well-formed.")
     print("\n#  The Python-code to generate this score:\n")
     musicxml_out_fn = f"{pathlib.Path(musicxml_file_path).stem}_generated.musicxml"
-    generated_code = generate_code_for_music_structure(score, add_boilerplate=add_boilerplate, musicxml_out_fn=musicxml_out_fn)
+    generated_code = generate_code_for_music_structure(
+        score, add_boilerplate=add_boilerplate, musicxml_out_fn=musicxml_out_fn
+    )
     print(generated_code)
 
 
