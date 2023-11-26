@@ -41,7 +41,7 @@ def execute_python_code(code_string):
 
 def test_generated_code_matches_original():
     original_code = f"""
-from music21 import stream, note, chord, duration, meter, clef, key, bar, tempo
+from music21 *
 
 {SCORE_NAME} = stream.Score()
 part = stream.Part()
