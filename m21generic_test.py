@@ -2,9 +2,7 @@
 
 import pytest
 
-from m21gen import generate_code_for_music_structure
-
-SCORE_NAME = "score"
+from m21gen import generate_code_for_music_structure, SCORE_NAME
 
 
 def parts_are_equal(part1, part2):
@@ -67,7 +65,7 @@ part.append(measure)
 """
 
     created_object = execute_python_code(original_code)
-    generated_code = generate_code_for_music_structure(created_object, SCORE_NAME)
+    generated_code = generate_code_for_music_structure(created_object)
     recreated_object = execute_python_code(generated_code)
 
     #    assert generated_code.strip() == original_code.strip()
