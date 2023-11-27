@@ -156,8 +156,60 @@ class InstrumentHandler(ElementHandler):
 class MetronomeMarkHandler(ElementHandler):
     handles = tempo.MetronomeMark
 
+    def generate_code(self, element, name):
+        """
+        """
+        params, insert = self.get_params(element)
+        placement = element.placement if hasattr(element, 'placement') else 'above'
+        return (
+            dedent(f"""
+            {name} = {self.get_hcls()}({params})
+            {name}.placement = '{placement}'
+            """),
+            insert,
+        )
+
     def get_params(self, element):
-        return f"number={element.number}", False
+        params = []
+
+        # Check for number attribute or derived tempo
+        tempo_number = getattr(element, 'number', None)
+        if tempo_number is None and hasattr(element, '_tempo'):
+            tempo_number = element._tempo
+
+        if tempo_number is not None:
+            params.append(f"number={tempo_number}")
+
+        # Check for text attribute
+        if element.text:
+            params.append(f"text='{element.text}'")
+
+        # Check for referent attribute
+        if element.referent:
+            referent_type = element.referent.type
+            params.append(f"referent=duration.Duration(type='{referent_type}')")
+
+        return ", ".join(params), False
+
+
+class StaffLayoutHandler(ElementHandler):
+    handles = layout.StaffLayout
+
+    def get_params(self, element):
+        params = []
+
+        # Handling properties of StaffLayout
+        # Common properties include 'staffDistance', 'staffNumber', etc.
+        properties = 'staffDistance staffNumber'.split()
+
+        # Iterate over properties and set them if they are not None
+        for prop in properties:
+            value = getattr(element, prop, None)
+            if value is not None:
+                params.append(f"{prop}={value}")
+
+        return ", ".join(params), False
+
 
 
 class MetadataHandler(ElementHandler):
@@ -280,6 +332,20 @@ class TextExpressionHandler(ElementHandler):
         content = element.content.replace("'", "\\'")
         return f"{name} = expressions.TextExpression('{content}')\n", False
 
+class StaffGroupHandler(ElementHandler):
+    handles = layout.StaffGroup
+
+    def generate_code(self, element, name):
+        code_lines = [f"{name} = {self.get_hcls()}()"]
+
+        for prop in 'symbol barTogether connectsAtTop connectsAtBottom'.split():
+            value = getattr(element, prop, None)
+            if value is not None:
+                value_str = f"'{value}'" if isinstance(value, str) else str(value)
+                code_lines.append(f"{name}.{prop} = {value_str}")
+
+        return "\n".join(code_lines), True
+
 
 class ContainerHandler(ElementHandler):
     def generate_code(self, element, name):
@@ -349,6 +415,8 @@ def generate_code_for_music_structure(
         file_path = "{musicxml_out_fn}"
         print(f"Saved to \"{musicxml_out_fn}\"")
         {SCORE_NAME}.write("musicxml", fp=file_path)
+        import subprocess
+        subprocess.run(f"open {musicxml_out_fn}".split())
         """
         )
     else:
