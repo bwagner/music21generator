@@ -4,7 +4,7 @@ Takes a [music21](https://web.mit.edu/music21/)-structure and generates the
 [Python](https://www.python.org/) code required to replicate this music21-structure.
 
 ## Purpose
-As a beginner using music21, it can be difficult to find the entry into the
+As a beginner using music21, it can be intimidating to find the entry into the
 library. But you might be experienced with a score editor like
 [musescore](https://musescore.org), [finale](https://www.finalemusic.com),
 [sibelius](https://www.avid.com/sibelius). So, you could start by creating a
