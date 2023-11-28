@@ -15,6 +15,22 @@ if __name__ == "__main__":
 
     from music21 import converter
 
+"""
+Containment Hierarchy:
+
+Score
+├── Metadata
+└── Part
+    ├── Instrument
+    └── Measure
+        ├── Barline
+        ├── Clef
+        ├── Key
+        ├── Note
+        ├── SystemLayout
+        ├── StaffLayout
+        └── TimeSignature
+"""
 
 class ElementHandler(ABC):
     _handlers = {}
@@ -374,14 +390,14 @@ class ContainerHandler(ElementHandler):
         return "\n".join(code_lines), False
 
     def custom_treatment(self, element, name):
-        pass
+        return []
 
 
 class PartHandler(ContainerHandler):
     handles = stream.Part
 
     def custom_treatment(self, element, name) -> str:
-        print(f"# {element.partName=} {element.partAbbreviation=}")
+        print(f"# {element.id=} {element.partName=} {element.partAbbreviation=}")
         return [f"generated_parts['{element.id}'] = {name}",
                 f"{name}.partName = '{element.partName}'",
                 f"{name}.partAbbreviation = '{element.partAbbreviation}'",
@@ -390,6 +406,16 @@ class PartHandler(ContainerHandler):
 
 class MeasureHandler(ContainerHandler):
     handles = stream.Measure
+
+    def custom_treatment(self, element, name) -> str:
+        # it's weird that this works, since name actually refers to a Part
+        # which I don't understand at all, since I'd expected name to be
+        # any of Measure's children in the containment hierarchy.
+        # In fact, Measure is a child of Part in the containment hierarchy!
+        return [
+                f"last_measure = {name}",
+                f"{name}.number = {element.number}",
+                ]
 
 
 class ScoreHandler(ContainerHandler):
@@ -407,6 +433,7 @@ def generate_code_for_music_structure(
         "from music21 import *",
         "",
         "generated_parts = dict()",
+        "last_measure = None",
     ]
 
     if handler := ElementHandler.get_handler(music_structure):
@@ -416,6 +443,11 @@ def generate_code_for_music_structure(
         raise NotImplementedError(
             f"No handler implemented for sub-element type {type(music_structure)} in MusicStructure"
         )
+
+    code_lines.append(
+    dedent("""
+        last_measure.rightBarline = bar.Barline(type="final")
+    """))
 
     code_str = "\n".join(code_lines)
 
