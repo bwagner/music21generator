@@ -330,7 +330,7 @@ class TextExpressionHandler(ElementHandler):
     def generate_code(self, element, name):
         # Escape single quotes in the text content
         content = element.content.replace("'", "\\'")
-        return f"{name} = expressions.TextExpression('{content}')\n", False
+        return f"{name} = {self.get_hcls()}('{content}')\n", False
 
 class StaffGroupHandler(ElementHandler):
     handles = layout.StaffGroup
@@ -343,6 +343,10 @@ class StaffGroupHandler(ElementHandler):
             if value is not None:
                 value_str = f"'{value}'" if isinstance(value, str) else str(value)
                 code_lines.append(f"{name}.{prop} = {value_str}")
+
+        for element in element.getSpannedElements():
+            code_lines.append(f"{name}.addSpannedElements(generated_parts['{element.id}'])")
+
 
         return "\n".join(code_lines), True
 
@@ -365,11 +369,19 @@ class ContainerHandler(ElementHandler):
                 raise NotImplementedError(
                     f"No handler implemented for sub-element type {type(sub_element)} in {self.handles.__qualname__}."
                 )
+        if (ct := self.custom_treatment(element, name)):
+            code_lines.append(ct)
         return "\n".join(code_lines), False
+
+    def custom_treatment(self, element, name):
+        pass
 
 
 class PartHandler(ContainerHandler):
     handles = stream.Part
+
+    def custom_treatment(self, element, name) -> str:
+        return f"generated_parts['{element.id}'] = {name}"
 
 
 class MeasureHandler(ContainerHandler):
@@ -390,6 +402,7 @@ def generate_code_for_music_structure(
     code_lines = [
         "from music21 import *",
         "",
+        "generated_parts = dict()",
     ]
 
     if handler := ElementHandler.get_handler(music_structure):
