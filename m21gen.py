@@ -370,7 +370,7 @@ class ContainerHandler(ElementHandler):
                     f"No handler implemented for sub-element type {type(sub_element)} in {self.handles.__qualname__}."
                 )
         if (ct := self.custom_treatment(element, name)):
-            code_lines.append(ct)
+            code_lines.extend(ct)
         return "\n".join(code_lines), False
 
     def custom_treatment(self, element, name):
@@ -381,7 +381,11 @@ class PartHandler(ContainerHandler):
     handles = stream.Part
 
     def custom_treatment(self, element, name) -> str:
-        return f"generated_parts['{element.id}'] = {name}"
+        print(f"# {element.partName=} {element.partAbbreviation=}")
+        return [f"generated_parts['{element.id}'] = {name}",
+                f"{name}.partName = '{element.partName}'",
+                f"{name}.partAbbreviation = '{element.partAbbreviation}'",
+                ]
 
 
 class MeasureHandler(ContainerHandler):
