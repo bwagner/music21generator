@@ -226,7 +226,7 @@ class StaffLayoutHandler(ElementHandler):
     def get_params(self, element) -> str:
         params = []
 
-        properties = "staffDistance staffNumber".split()
+        properties = "staffDistance staffNumber staffLines".split()
 
         # Iterate over properties and set them if they are not None
         for prop in properties:
