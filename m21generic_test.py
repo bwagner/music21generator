@@ -2,7 +2,7 @@
 
 import pytest
 
-from m21gen import generate_code_for_music_structure, SCORE_NAME
+from m21gen import SCORE_NAME, generate_code_for_music_structure
 
 
 def parts_are_equal(part1, part2):
@@ -41,7 +41,7 @@ def execute_python_code(code_string):
 
 def test_generated_code_matches_original():
     original_code = f"""
-from music21 *
+from music21 import *
 
 {SCORE_NAME} = stream.Score()
 part = stream.Part()
