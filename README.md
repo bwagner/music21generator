@@ -1,4 +1,4 @@
-# m21gen
+# music21generator
 
 Takes a [music21](https://web.mit.edu/music21/)-structure and generates the
 [Python](https://www.python.org/) code required to replicate this music21-structure.
@@ -15,25 +15,51 @@ skeleton Python script as a stepping stone and add procedural or generative
 aspects.
 
 ## Installation
-```
+```console
+git clone https://github.com/bwagner/music21generator.git
+cd music21generator
 pip install -r requirements.txt
 ```
 
 ## Use
-```
-m21gen.py MUSICXML_FILE > GENERATED_PYTHON_SCRIPT_NAME
-Generates Python code to reproduce the given MUSICXML_FILE.
+```console
 
-m21gen.py -b MUSICXML_FILE
-Generates Python code to reproduce the given MUSICXML_FILE
-and adds some boilerplate to save the music21-structure generated
-by the generated Python script to a new MUSICXML_FILE.
+/path/to/music21generator/m21gen.py MUSICXML_FILE > GENERATED_PYTHON_SCRIPT_NAME
+
+# Generates Python code to reproduce the given MUSICXML_FILE on stdout and stores it
+# in GENERATED_PYTHON_SCRIPT_NAME.
+
+
+/path/to/music21generator/m21gen.py -b MUSICXML_FILE > GENERATED_PYTHON_SCRIPT_NAME
+
+# Generates Python code to reproduce the given MUSICXML_FILE on stdout
+# and adds some boilerplate to save the music21-structure generated
+# by the generated Python script to a new MUSICXML_FILE and stores it in
+# GENERATED_PYTHON_SCRIPT_NAME.
+
+/path/to/music21generator/m21gen.py MUSICXML_FILE | python
+
+# Generates Python code to reproduce the given MUSICXML_FILE and executes it right away.
 ```
+
+## Limitations
+For now,
+[articulations](https://web.mit.edu/music21/doc/moduleReference/moduleArticulations.html) and
+many other features of music21 are missing.
+It's uncertain whether these will ever be implemented, since this tool is only supposed to give
+you a head start.
 
 ## Contributing
+```console
+git clone https://github.com/bwagner/music21generator.git
+cd music21generator
+pip install -r requirements.txt -r dev-requirements.txt
+pre-commit install
+```
 
 ## Tests
-```
+```console
+cd music21generator
 pytest
 ```
 
