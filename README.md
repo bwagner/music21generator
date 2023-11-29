@@ -3,6 +3,21 @@
 Takes a [music21](https://web.mit.edu/music21/)-structure and generates the
 [Python](https://www.python.org/) code required to replicate this music21-structure.
 
+```console
+
+ Usage: m21gen.py [OPTIONS] MUSICXML_FILE_PATH
+
+╭─ Arguments ────────────────────────────────────────────────────────────────╮
+│ *    musicxml_file_path      TEXT  Path to musicxml file [required]        │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ──────────────────────────────────────────────────────────────────╮
+│ --omit-boilerplate       -n        Omit boilerplate code [default: False]  │
+│ --display-m21-structure  -m        Display m21 structure (for debugging)   │
+│ --help                             Show this message and exit.             │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+```
+
 ## Purpose
 As a beginner using music21, it can be intimidating to find the entry into the
 library. But you might be experienced with a score editor like
