@@ -23,6 +23,7 @@ Score
 ├── TextBox
 └── Part
     ├── Instrument
+    ├── Slur
     └── Measure
         ├── Barline
         ├── Clef
@@ -36,6 +37,8 @@ Score
         ├── StaffLayout
         └── TimeSignature
 """
+
+resolve_spanners = ""
 
 
 class ElementHandler(ABC):
@@ -103,6 +106,15 @@ class ElementHandler(ABC):
 
 class NoteHandler(ElementHandler):
     handles = note.Note
+
+    def generate_code(self, element, name: str) -> str:
+        params = self.get_params(element)
+        return dedent(
+            f"""
+            {name} = {self.get_hcls()}({params})
+            generated_notes['{element.id}'] = {name}
+        """
+        )
 
     def get_params(self, element) -> str:
         return f"'{element.pitch}', duration=duration.Duration({element.duration.quarterLength})"
@@ -467,7 +479,27 @@ class RepeatHandler(ElementHandler):
 
 class SlurHandler(ElementHandler):
     handles = spanner.Slur
-    insert_at_start = True  # Class variable for insertion
+    insert = True
+
+    def generate_code(self, element, name: str) -> str:
+        global resolve_spanners
+        params = self.get_params(element)
+        # The Notes we're referring to here are only generated later, so we need store the code to resolve the spanners
+        # to be executed at the end.
+        # To keep the reference to the right spanner (Slur), we store it under the id of its first note. This should be
+        # unique. We could have used the id of the freshly generated slur, too.
+        resolve_spanners += dedent(
+            f"""
+            generated_spanners['{element.getFirst().id}'].addSpannedElements(generated_notes['{element.getFirst().id}'])
+            generated_spanners['{element.getFirst().id}'].addSpannedElements(generated_notes['{element.getLast().id}'])
+        """
+        )
+        return dedent(
+            f"""
+            {name} = {self.get_hcls()}({params})
+            generated_spanners['{element.getFirst().id}'] = {name}
+        """
+        )
 
     def get_params(self, element):
         params = []
@@ -493,7 +525,6 @@ class SlurHandler(ElementHandler):
 
 class UnpitchedHandler(ElementHandler):
     handles = note.Unpitched
-    insert_at_start = False  # Class variable for insertion
 
     def get_params(self, element):
         params = []
@@ -523,6 +554,8 @@ def generate_code_for_music_structure(
         f"# {'without' if omit_boilerplate else 'with'} boilerplate.",
         "",
         "generated_parts = dict()",
+        "generated_notes = dict()",
+        "generated_spanners = dict()",
         "last_measure = None",  # save potentially last measure for final barline
     ]
 
@@ -550,6 +583,8 @@ def generate_code_for_music_structure(
     )
 
     code_str = "\n".join(code_lines)
+
+    code_str += resolve_spanners
 
     if not omit_boilerplate:
         code_str += dedent(
