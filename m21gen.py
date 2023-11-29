@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import contextlib
 import warnings
 from abc import ABC
 from datetime import datetime
@@ -21,13 +20,18 @@ Containment Hierarchy:
 
 Score
 ├── Metadata
+├── TextBox
 └── Part
     ├── Instrument
     └── Measure
         ├── Barline
         ├── Clef
-        ├── Key
+        ├── KeySignature
         ├── Note
+        ├── Rest
+        ├── PageLayout
+        ├── RehearsalMark
+        ├── Repeat
         ├── SystemLayout
         ├── StaffLayout
         └── TimeSignature
@@ -416,6 +420,96 @@ class StreamHandler(ContainerHandler):
     handles = stream.Stream
 
 
+class RehearsalMarkHandler(ElementHandler):
+    handles = expressions.RehearsalMark
+    insert = True
+
+    def get_params(self, element):
+        params = []
+
+        # Handle the text of the rehearsal mark
+        if hasattr(element, "content"):
+            params.append(f"content='{element.content}'")
+
+        # Handle placement (above or below)
+        if hasattr(element, "placement"):
+            params.append(f"placement='{element.placement}'")
+
+        # Handle font properties (if relevant and available in music21)
+        if hasattr(element, "fontStyle"):
+            params.append(f"fontStyle='{element.fontStyle}'")
+        if hasattr(element, "fontSize"):
+            params.append(f"fontSize={element.fontSize}")
+        if hasattr(element, "fontWeight"):
+            params.append(f"fontWeight='{element.fontWeight}'")
+
+        # Add other attributes as needed based on the properties of the RehearsalMark
+        # ...
+
+        return ", ".join(params)
+
+
+class RepeatHandler(ElementHandler):
+    handles = bar.Repeat
+
+    def get_params(self, element):
+        params = []
+
+        # Handle direction of the repeat (start or end)
+        if hasattr(element, "direction"):
+            params.append(f"direction='{element.direction}'")
+
+        # Add other attributes as needed based on the properties of the Repeat
+        # ...
+
+        return ", ".join(params)
+
+
+class SlurHandler(ElementHandler):
+    handles = spanner.Slur
+    insert_at_start = True  # Class variable for insertion
+
+    def get_params(self, element):
+        params = []
+
+        # Handle the type of the slur (start or stop)
+        # MusicXML 'type' attribute maps to Slur's start/stop methods in music21
+        if hasattr(element, "type"):
+            params.append(f"type='{element.type}'")
+
+        # Handle the placement of the slur (above or below)
+        if hasattr(element, "placement"):
+            params.append(f"placement='{element.placement}'")
+
+        # Handle the number attribute (if used for identifying slurs in MusicXML)
+        if hasattr(element, "number"):
+            params.append(f"number={element.number}")
+
+        # Add other attributes as needed based on the properties of the Slur
+        # ...
+
+        return ", ".join(params)
+
+
+class UnpitchedHandler(ElementHandler):
+    handles = note.Unpitched
+    insert_at_start = False  # Class variable for insertion
+
+    def get_params(self, element):
+        params = []
+
+        # Handle the display step and octave
+        if hasattr(element, "displayStep"):
+            params.append(f"displayStep='{element.displayStep}'")
+        if hasattr(element, "displayOctave"):
+            params.append(f"displayOctave={element.displayOctave}")
+
+        # Add other attributes as needed based on the properties of the Unpitched object
+        # ...
+
+        return ", ".join(params)
+
+
 def generate_code_for_music_structure(
     music_structure,
     omit_boilerplate=False,
@@ -479,6 +573,20 @@ def generate_code_for_music_structure(
 
 if __name__ == "__main__":
 
+    def print2(func):
+        """
+        Swaps stdout and stderr, then calls func, then swaps stdout and stderr again.
+
+        Classically, this would be attained by using:
+        with contextlib.redirect_stdout:
+            func()
+        which would even render this function print2 obsolete, but doing so gave an error:
+        TypeError: 'ABCMeta' object does not support the context manager protocol
+        """
+        sys.stdout, sys.stderr = sys.stderr, sys.stdout
+        func()
+        sys.stdout, sys.stderr = sys.stderr, sys.stdout
+
     def custom_help_check():
         """
         Adds command line options "-h" and "-?" to the default "--help" to
@@ -504,8 +612,7 @@ if __name__ == "__main__":
         score = converter.parse(musicxml_file_path)
 
         if display_m21_structure:
-            with contextlib.redirect_stdout:
-                score.show("text")
+            print2(lambda: score.show("text"))
 
         print("#!/usr/bin/env python\n")
         musicxml_out_fn = f"{P(musicxml_file_path).stem}_generated.musicxml"
