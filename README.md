@@ -19,15 +19,14 @@ Takes a [music21](https://web.mit.edu/music21/)-structure and generates the
 ```
 
 ## Purpose
-As a beginner using music21, it can be intimidating to find the entry into the
-library. But you might be experienced with a score editor like
+Starting your journey using [music21](https://web.mit.edu/music21/) can be daunting.
+But you might be experienced using a score editor like
 [musescore](https://musescore.org), [finale](https://www.finalemusic.com),
-[sibelius](https://www.avid.com/sibelius). So, you could start by creating a
+[sibelius](https://www.avid.com/sibelius). So, you could start by creating a skeleton
 score using any of those editors, export it as
-[musicxml](https://www.musicxml.com), pass it to m21gen.py, which generates the
-Python code that reproduces this document.  Finally, use this generated
-skeleton Python script as a stepping stone and add procedural or generative
-aspects.
+[musicxml](https://www.musicxml.com), pass it to `m21gen.py`, which then generates the
+Python code that reproduces this document. Finally, use this generated
+skeleton Python script as a stepping stone and add algorithmic ideas.
 
 ## Installation
 ```console
