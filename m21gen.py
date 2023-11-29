@@ -455,7 +455,15 @@ def generate_code_for_music_structure(
         code_lines.extend(element_code.split("\n"))
     else:
         raise NotImplementedError(
-            f"No handler implemented for sub-element type {type(music_structure)} in MusicStructure"
+            dedent(
+                f"""
+
+            No handler implemented for sub-element type {type(music_structure)} in MusicStructure.
+
+            Go ahead and contribute class {type(music_structure).__name__}Handler(ElementHandler)!
+
+         """
+            )
         )
 
     code_lines.append(
