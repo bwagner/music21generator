@@ -54,8 +54,8 @@ pip install -r requirements.txt
 For now,
 [articulations](https://web.mit.edu/music21/doc/moduleReference/moduleArticulations.html) and
 many other features of music21 are missing.
-It's uncertain whether these will ever be implemented, since this tool is only supposed to give
-you a head start.
+It's uncertain whether these will ever be implemented, since this tool is only supposed to
+help you get started.
 
 ## Contributing
 ```console
