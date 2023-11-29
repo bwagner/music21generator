@@ -32,6 +32,7 @@ Score
         └── TimeSignature
 """
 
+
 class ElementHandler(ABC):
     _handlers = {}
 
@@ -173,15 +174,16 @@ class MetronomeMarkHandler(ElementHandler):
     handles = tempo.MetronomeMark
 
     def generate_code(self, element, name):
-        """
-        """
+        """ """
         params, insert = self.get_params(element)
-        placement = element.placement if hasattr(element, 'placement') else 'above'
+        placement = element.placement if hasattr(element, "placement") else "above"
         return (
-            dedent(f"""
+            dedent(
+                f"""
             {name} = {self.get_hcls()}({params})
             {name}.placement = '{placement}'
-            """),
+            """
+            ),
             insert,
         )
 
@@ -189,8 +191,8 @@ class MetronomeMarkHandler(ElementHandler):
         params = []
 
         # Check for number attribute or derived tempo
-        tempo_number = getattr(element, 'number', None)
-        if tempo_number is None and hasattr(element, '_tempo'):
+        tempo_number = getattr(element, "number", None)
+        if tempo_number is None and hasattr(element, "_tempo"):
             tempo_number = element._tempo
 
         if tempo_number is not None:
@@ -216,7 +218,7 @@ class StaffLayoutHandler(ElementHandler):
 
         # Handling properties of StaffLayout
         # Common properties include 'staffDistance', 'staffNumber', etc.
-        properties = 'staffDistance staffNumber'.split()
+        properties = "staffDistance staffNumber".split()
 
         # Iterate over properties and set them if they are not None
         for prop in properties:
@@ -225,7 +227,6 @@ class StaffLayoutHandler(ElementHandler):
                 params.append(f"{prop}={value}")
 
         return ", ".join(params), False
-
 
 
 class MetadataHandler(ElementHandler):
@@ -348,21 +349,23 @@ class TextExpressionHandler(ElementHandler):
         content = element.content.replace("'", "\\'")
         return f"{name} = {self.get_hcls()}('{content}')\n", False
 
+
 class StaffGroupHandler(ElementHandler):
     handles = layout.StaffGroup
 
     def generate_code(self, element, name):
         code_lines = [f"{name} = {self.get_hcls()}()"]
 
-        for prop in 'symbol barTogether connectsAtTop connectsAtBottom'.split():
+        for prop in "symbol barTogether connectsAtTop connectsAtBottom".split():
             value = getattr(element, prop, None)
             if value is not None:
                 value_str = f"'{value}'" if isinstance(value, str) else str(value)
                 code_lines.append(f"{name}.{prop} = {value_str}")
 
         for element in element.getSpannedElements():
-            code_lines.append(f"{name}.addSpannedElements(generated_parts['{element.id}'])")
-
+            code_lines.append(
+                f"{name}.addSpannedElements(generated_parts['{element.id}'])"
+            )
 
         return "\n".join(code_lines), True
 
@@ -383,9 +386,17 @@ class ContainerHandler(ElementHandler):
                     code_lines.append(f"{name}.append({prefix}_e{i})")
             else:
                 raise NotImplementedError(
-                    f"No handler implemented for sub-element type {type(sub_element)} in {self.handles.__qualname__}."
+                    dedent(
+                        f"""
+
+                    No handler implemented for sub-element type {type(sub_element)} in {self.handles.__qualname__}.
+
+                    Go ahead and contribute class {type(sub_element).__name__}Handler(ElementHandler)!
+
+                 """
+                    )
                 )
-        if (ct := self.custom_treatment(element, name)):
+        if ct := self.custom_treatment(element, name):
             code_lines.extend(ct)
         return "\n".join(code_lines), False
 
@@ -398,10 +409,11 @@ class PartHandler(ContainerHandler):
 
     def custom_treatment(self, element, name) -> str:
         print(f"# {element.id=} {element.partName=} {element.partAbbreviation=}")
-        return [f"generated_parts['{element.id}'] = {name}",
-                f"{name}.partName = '{element.partName}'",
-                f"{name}.partAbbreviation = '{element.partAbbreviation}'",
-                ]
+        return [
+            f"generated_parts['{element.id}'] = {name}",
+            f"{name}.partName = '{element.partName}'",
+            f"{name}.partAbbreviation = '{element.partAbbreviation}'",
+        ]
 
 
 class MeasureHandler(ContainerHandler):
@@ -413,9 +425,9 @@ class MeasureHandler(ContainerHandler):
         # any of Measure's children in the containment hierarchy.
         # In fact, Measure is a child of Part in the containment hierarchy!
         return [
-                f"last_measure = {name}",
-                f"{name}.number = {element.number}",
-                ]
+            f"last_measure = {name}",
+            f"{name}.number = {element.number}",
+        ]
 
 
 class ScoreHandler(ContainerHandler):
@@ -445,9 +457,12 @@ def generate_code_for_music_structure(
         )
 
     code_lines.append(
-    dedent("""
+        dedent(
+            """
         last_measure.rightBarline = bar.Barline(type="final")
-    """))
+    """
+        )
+    )
 
     code_str = "\n".join(code_lines)
 
