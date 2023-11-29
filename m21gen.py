@@ -516,33 +516,33 @@ def print2(func):
     sys.stdout, sys.stderr = sys.stderr, sys.stdout
 
 
-def main(
-    add_boilerplate: bool = typer.Option(
-        True, "--add-no-boilerplate", "-n", help="Add boilerplate code"
-    ),
-    output_m21_structure: bool = typer.Option(
-        False, "--output-m21-structure", "-m", help="Output m21 structure"
-    ),
-    musicxml_file_path: str = typer.Argument(
-        ..., help="Path to musicxml file", show_default=False
-    ),
-):
-    score = converter.parse(musicxml_file_path)
-
-    if output_m21_structure:
-        print2(lambda: score.show("text"))
-
-    print("#!/usr/bin/env python\n")
-    musicxml_out_fn = f"{P(musicxml_file_path).stem}_generated.musicxml"
-    generated_code = generate_code_for_music_structure(
-        score,
-        add_boilerplate=add_boilerplate,
-        musicxml_out_fn=musicxml_out_fn,
-        origin=musicxml_file_path,
-    )
-    print(generated_code)
-
-
 if __name__ == "__main__":
+
+    def main(
+        add_boilerplate: bool = typer.Option(
+            True, "--add-no-boilerplate", "-n", help="Add boilerplate code"
+        ),
+        output_m21_structure: bool = typer.Option(
+            False, "--output-m21-structure", "-m", help="Output m21 structure"
+        ),
+        musicxml_file_path: str = typer.Argument(
+            ..., help="Path to musicxml file", show_default=False
+        ),
+    ):
+        score = converter.parse(musicxml_file_path)
+
+        if output_m21_structure:
+            print2(lambda: score.show("text"))
+
+        print("#!/usr/bin/env python\n")
+        musicxml_out_fn = f"{P(musicxml_file_path).stem}_generated.musicxml"
+        generated_code = generate_code_for_music_structure(
+            score,
+            add_boilerplate=add_boilerplate,
+            musicxml_out_fn=musicxml_out_fn,
+            origin=musicxml_file_path,
+        )
+        print(generated_code)
+
     custom_help_check()
     typer.run(main)
