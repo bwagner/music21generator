@@ -41,16 +41,10 @@ pip install -r requirements.txt
 
 /path/to/music21generator/m21gen.py MUSICXML_FILE > GENERATED_PYTHON_SCRIPT_NAME
 
-# Generates Python code to reproduce the given MUSICXML_FILE on stdout and stores it
-# in GENERATED_PYTHON_SCRIPT_NAME.
-
-
-/path/to/music21generator/m21gen.py -b MUSICXML_FILE > GENERATED_PYTHON_SCRIPT_NAME
-
 # Generates Python code to reproduce the given MUSICXML_FILE on stdout
 # and adds some boilerplate to save the music21-structure generated
-# by the generated Python script to a new MUSICXML_FILE and stores it in
-# GENERATED_PYTHON_SCRIPT_NAME.
+# by the generated Python script to a new MUSICXML_FILE. In the above incantation,
+# stdout is captured in GENERATED_PYTHON_SCRIPT_NAME.
 
 /path/to/music21generator/m21gen.py MUSICXML_FILE | python
 
