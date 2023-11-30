@@ -72,17 +72,15 @@ class ElementHandler(ABC):
         return f"{name} = {self.get_hcls()}({params})"
 
     def get_params(self, element) -> str:
-        """
-        Implemented by subclasses if they don't implement generate_code.
-        Returns a tuple:
-        - A string consisting of the parameters for the constructor of the music21-class
-          handled by this Handler.
-        - True if the element should be inserted at the beginning, False if at the end
-          of its container.
-        Not declared abstractmethod, because sometimes generated_code is overridden
-        and no get_params method is required.
-        """
-        raise NotImplementedError("abstract method: This code should never run.")
+        params = []
+        for prop in self.get_properties():
+            if (value := getattr(element, prop, None)) is not None:
+                params.append(f"{prop}='{value}'")
+
+        return ", ".join(params)
+
+    def get_properties(self) -> list[str]:
+        return []
 
     @classmethod
     def get_handler(cls, element):
@@ -140,8 +138,7 @@ class ChordSymbolHandler(ElementHandler):
     handles = harmony.ChordSymbol
 
     def get_params(self, element) -> str:
-        chord_figure = element.figure  # Get the chord symbol as a string, e.g., "Cmaj7"
-        return f"'{chord_figure}'"
+        return f"'{element.figure}'"  # Get the chord symbol as a string, e.g., "Cmaj7"
 
 
 class TimeSignatureHandler(ElementHandler):
@@ -229,30 +226,16 @@ class MetronomeMarkHandler(ElementHandler):
 class StaffLayoutHandler(ElementHandler):
     handles = layout.StaffLayout
 
-    def get_params(self, element) -> str:
-        params = []
-        properties = "staffDistance staffNumber staffLines".split()
-        for prop in properties:
-            value = getattr(element, prop, None)
-            if value is not None:
-                params.append(f"{prop}='{value}'")
-
-        return ", ".join(params)
+    def get_properties(self) -> list[str]:
+        return "staffDistance staffNumber staffLines".split()
 
 
 class MetadataHandler(ElementHandler):
     handles = metadata.Metadata
     insert = True
 
-    def get_params(self, element) -> str:
-        params = []
-        properties = "title composer lyricist".split()
-        for prop in properties:
-            value = getattr(element, prop, None)
-            if value is not None:
-                params.append(f"{prop}='{value}'")
-
-        return ", ".join(params)
+    def get_properties(self) -> list[str]:
+        return "title composer lyricist".split()
 
 
 class RestHandler(ElementHandler):
@@ -298,16 +281,8 @@ class ScoreLayoutHandler(ElementHandler):
     handles = layout.ScoreLayout
     insert = True
 
-    def generate_code(self, element, name: str) -> str:
-        code_lines = [f"{name} = {self.get_hcls()}()"]
-
-        if hasattr(element, "staffDistance"):
-            code_lines.append(f"{name}.staffDistance = {element.staffDistance}")
-
-        # Include other relevant attributes of ScoreLayout as needed
-        # ...
-
-        return "\n".join(code_lines)
+    def get_properties(self) -> list[str]:
+        return "staffDistance".split()
 
 
 class SystemLayoutHandler(ElementHandler):
@@ -317,13 +292,20 @@ class SystemLayoutHandler(ElementHandler):
     def generate_code(self, element, name: str) -> str:
         code_lines = [f"{name} = {self.get_hcls()}(isNew={element.isNew})"]
 
-        if hasattr(element, "systemDistance"):
-            code_lines.append(f"{name}.systemDistance = {element.systemDistance}")
-
-        if hasattr(element, "topSystemDistance"):
-            code_lines.append(f"{name}.topSystemDistance = {element.topSystemDistance}")
+        code_lines.extend(self.get_lines(element, name))
 
         return "\n".join(code_lines)
+
+    def get_lines(self, element, name) -> str:
+        code_lines = []
+        for prop in self.get_properties():
+            if (value := getattr(element, prop, None)) is not None:
+                code_lines.append(f"{name}.{prop}='{value}'")
+
+        return code_lines
+
+    def get_properties(self) -> list[str]:
+        return "systemDistance topSystemDistance".split()
 
 
 class PageLayoutHandler(ElementHandler):
@@ -331,10 +313,22 @@ class PageLayoutHandler(ElementHandler):
     insert = True
 
     def generate_code(self, element, name: str) -> str:
-        code_lines = [f"{name} = layout.PageLayout()"]
+        code_lines = [f"{name} = {self.get_hcls()}()"]
 
-        # List of potential properties in PageLayout
-        properties = [
+        code_lines.extend(self.get_lines(element, name))
+
+        return "\n".join(code_lines)
+
+    def get_lines(self, element, name) -> str:
+        code_lines = []
+        for prop in self.get_properties():
+            if (value := getattr(element, prop, None)) is not None:
+                code_lines.append(f"{name}.{prop}='{value}'")
+
+        return code_lines
+
+    def get_properties(self) -> list[str]:
+        return [
             "leftMargin",
             "rightMargin",
             "topMargin",
@@ -344,13 +338,6 @@ class PageLayoutHandler(ElementHandler):
             "isPortrait",
             # Add more properties here as needed
         ]
-
-        for prop in properties:
-            value = getattr(element, prop, None)
-            if value is not None:
-                code_lines.append(f"{name}.{prop} = {value}")
-
-        return "\n".join(code_lines)
 
 
 class TextExpressionHandler(ElementHandler):
@@ -536,19 +523,8 @@ class SlurHandler(ElementHandler):
 class UnpitchedHandler(ElementHandler):
     handles = note.Unpitched
 
-    def get_params(self, element):
-        params = []
-
-        # Handle the display step and octave
-        if hasattr(element, "displayStep"):
-            params.append(f"displayStep='{element.displayStep}'")
-        if hasattr(element, "displayOctave"):
-            params.append(f"displayOctave={element.displayOctave}")
-
-        # Add other attributes as needed based on the properties of the Unpitched object
-        # ...
-
-        return ", ".join(params)
+    def get_properties(self) -> list[str]:
+        return "displayStep displayOctave".split()
 
 
 def generate_code_for_music_structure(
