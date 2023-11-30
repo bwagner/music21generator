@@ -109,12 +109,18 @@ class NoteHandler(ElementHandler):
 
     def generate_code(self, element, name: str) -> str:
         params = self.get_params(element)
-        return dedent(
+        code = dedent(
             f"""
-            {name} = {self.get_hcls()}({params})
-            generated_notes['{element.id}'] = {name}
+        {name} = {self.get_hcls()}({params})
+        generated_notes['{element.id}'] = {name}
         """
         )
+        if element.lyric:
+            # had to dedent manually, because there were multiline lyrics.
+            code += f"""
+{name}.lyric = '''{element.lyric}'''
+        """
+        return code
 
     def get_params(self, element) -> str:
         return f"'{element.pitch}', duration=duration.Duration({element.duration.quarterLength})"
@@ -225,14 +231,11 @@ class StaffLayoutHandler(ElementHandler):
 
     def get_params(self, element) -> str:
         params = []
-
         properties = "staffDistance staffNumber staffLines".split()
-
-        # Iterate over properties and set them if they are not None
         for prop in properties:
             value = getattr(element, prop, None)
             if value is not None:
-                params.append(f"{prop}={value}")
+                params.append(f"{prop}='{value}'")
 
         return ", ".join(params)
 
@@ -242,7 +245,14 @@ class MetadataHandler(ElementHandler):
     insert = True
 
     def get_params(self, element) -> str:
-        return f"title='{element.title}', composer='{element.composer}'"
+        params = []
+        properties = "title composer lyricist".split()
+        for prop in properties:
+            value = getattr(element, prop, None)
+            if value is not None:
+                params.append(f"{prop}='{value}'")
+
+        return ", ".join(params)
 
 
 class RestHandler(ElementHandler):
