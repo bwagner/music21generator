@@ -69,7 +69,13 @@ class ElementHandler(ABC):
                          at the beginning, False if at the end of its container.
         """
         params = self.get_params(element)
-        return f"{name} = {self.get_hcls()}({params})"
+        code_lines = [f"{name} = {self.get_hcls()}({params})"]
+        if ct := self.custom_treatment(element, name):
+            code_lines.extend(ct)
+        return "\n".join(code_lines)
+
+    def custom_treatment(self, element, name: str) -> list[str]:
+        return []
 
     def get_params(self, element) -> str:
         params = []
@@ -396,7 +402,7 @@ class ContainerHandler(ElementHandler):
             code_lines.extend(ct)
         return "\n".join(code_lines)
 
-    def custom_treatment(self, element, name: str):
+    def custom_treatment(self, element, name: str) -> list[str]:
         return []
 
 
@@ -430,32 +436,35 @@ class StreamHandler(ContainerHandler):
 
 
 class RehearsalMarkHandler(ElementHandler):
+    # TODO:
+    #
+    # RehearsalMarks in musicxml are embedded in a direction element:
+    #
+    # <direction placement="above">
+    #   <direction-type>
+    #     <rehearsal>A</rehearsal>
+    #   </direction-type>
+    # </direction>
+    #
+    # But in the musicxml we generate it ends up:
+    #
+    # <direction>
+    #   <direction-type>
+    #     <rehearsal enclosure="none" halign="center" valign="middle">A</rehearsal>
+    #   </direction-type>
+    # </direction>
+    #
+    # enclosure, halign, valign were not in the original rehearsal mark, and the
+    # placement="above" attribute in the containing direction is missing.
+    # This attibute would be essential to have the rehearsalmark above the staff.
+    # I don't know how to get at that enclosing direction element from the rehearsal
+    # mark.
+
     handles = expressions.RehearsalMark
     insert = True
 
-    def get_params(self, element):
-        params = []
-
-        # Handle the text of the rehearsal mark
-        if hasattr(element, "content"):
-            params.append(f"content='{element.content}'")
-
-        # Handle placement (above or below)
-        if hasattr(element, "placement"):
-            params.append(f"placement='{element.placement}'")
-
-        # Handle font properties (if relevant and available in music21)
-        if hasattr(element, "fontStyle"):
-            params.append(f"fontStyle='{element.fontStyle}'")
-        if hasattr(element, "fontSize"):
-            params.append(f"fontSize={element.fontSize}")
-        if hasattr(element, "fontWeight"):
-            params.append(f"fontWeight='{element.fontWeight}'")
-
-        # Add other attributes as needed based on the properties of the RehearsalMark
-        # ...
-
-        return ", ".join(params)
+    def get_properties(self) -> list[str]:
+        return "content".split()
 
 
 class RepeatHandler(ElementHandler):
